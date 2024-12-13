@@ -1,28 +1,31 @@
-# NeCA: 3D Coronary Artery Tree Reconstruction from Two 2D Projections by Neural Implicit Representation
+# NeCA: 3D Coronary Artery Tree Reconstruction from Two 2D Projections via Neural Implicit Representation
 
 # 1. Overview
 
-This is the code repository for the [NeCA](https://arxiv.org/abs/2409.04596) paper by Yiying Wang, Abhirup Banerjee and Vicente Grau.
+This is the official code repository for the [NeCA](https://www.mdpi.com/2306-5354/11/12/1227) paper by Yiying Wang, Abhirup Banerjee and Vicente Grau, published at Bioengineering (invited submission free of charge for open-access publication).
 
 ## Citation
 
 If you find the code are useful, please consider citing the paper.
 
 ```
-@misc{wang2024neca3dcoronaryartery,
-      title={NeCA: 3D Coronary Artery Tree Reconstruction from Two 2D Projections by Neural Implicit Representation}, 
-      author={Yiying Wang and Abhirup Banerjee and Vicente Grau},
-      year={2024},
-      eprint={2409.04596},
-      archivePrefix={arXiv},
-      primaryClass={eess.IV},
-      url={https://arxiv.org/abs/2409.04596}, 
+@Article{wang2024neca3dcoronaryartery,
+AUTHOR = {Wang, Yiying and Banerjee, Abhirup and Grau, Vicente},
+TITLE = {NeCA: 3D Coronary Artery Tree Reconstruction from Two 2D Projections via Neural Implicit Representation},
+JOURNAL = {Bioengineering},
+VOLUME = {11},
+YEAR = {2024},
+NUMBER = {12},
+ARTICLE-NUMBER = {1227},
+URL = {https://www.mdpi.com/2306-5354/11/12/1227},
+ISSN = {2306-5354},
+DOI = {10.3390/bioengineering11121227}
 }
 ```
 
 # 2. Introduction
 
-Cardiovascular diseases (CVDs) are the most common health threats worldwide. 2D x-ray invasive coronary angiography (ICA) remains as the most widely adopted imaging modality for CVDs diagnosis. However, in current clinical practice, it is often difficult for the cardiologists to interpret the 3D geometry of coronary vessels based on 2D planes. Moreover, due to the radiation limit, in general only two angiographic projections are acquired, providing limited information of the vessel geometry and necessitating 3D coronary tree reconstruction based only on two ICA projections. In this paper, we propose a self-supervised deep learning method called NeCA, which is based on implicit neural representation using the multiresolution hash encoder and differentiable cone-beam forward projector layer in order to achieve 3D coronary artery tree reconstruction from two projections. We validate our method using six different metrics on coronary computed tomography angiography data in terms of right coronary artery and left anterior descending respectively. The evaluation results demonstrate that our NeCA method, without 3D ground truth for supervision and large datasets for training, achieves promising performance in both vessel topology preservation and branch-connectivity maintaining compared to the supervised deep learning model.
+Cardiovascular diseases (CVDs) are the most common health threats worldwide. 2D X-ray invasive coronary angiography (ICA) remains the most widely adopted imaging modality for CVD assessment during real-time cardiac interventions. However, it is often difficult for the cardiologists to interpret the 3D geometry of coronary vessels based on 2D planes. Moreover, due to the radiation limit, often only two angiographic projections are acquired, providing limited information of the vessel geometry and necessitating 3D coronary tree reconstruction based only on two ICA projections. In this paper, we propose a self-supervised deep learning method called NeCA, which is based on neural implicit representation using the multiresolution hash encoder and differentiable cone-beam forward projector layer, in order to achieve 3D coronary artery tree reconstruction from two 2D projections. We validate our method using six different metrics on a dataset generated from coronary computed tomography angiography of right coronary artery and left anterior descending artery. The evaluation results demonstrate that our NeCA method, without requiring 3D ground truth for supervision or large datasets for training, achieves promising performance in both vessel topology and branch-connectivity preservation compared to the supervised deep learning model.
 
 ## Our Proposed Model Architecture
 
