@@ -6,7 +6,7 @@ This is the official code repository for the [NeCA](https://www.mdpi.com/2306-53
 
 ## Citation
 
-If you find the code are useful, please consider citing the paper.
+If you find the code useful, please consider citing the paper.
 
 ```
 @Article{wang2024neca3dcoronaryartery,
