@@ -53,7 +53,7 @@ argparse
 
 ## Data Preparation
 
-Please prepare your projection data in shape `(Batch, Number of projections, Height, Weight)` and put the data under the `./data/CCTA_test/` folder. We recommend to use [ODL](https://github.com/odlgroup/odl) to generate your simulated projections from 3D coronary tree, which is tested and incorporated in this work.
+Please prepare your projection data in shape `(1, Number of projections, Height, Weight)` and put the data under the `./data/CCTA_test/` folder. We recommend to use [ODL](https://github.com/odlgroup/odl) to generate your simulated projections from 3D coronary tree, which is tested and incorporated in this work.
 
 Then please update the corresponding projection geometry in the file `./data/config.yml`.
 
