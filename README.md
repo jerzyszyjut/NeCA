@@ -2,7 +2,7 @@
 
 # 1. Overview
 
-This is the official code repository for the [NeCA](https://www.mdpi.com/2306-5354/11/12/1227) paper by Yiying Wang, Abhirup Banerjee and Vicente Grau, published at Bioengineering (invited submission free of charge for open-access publication).
+This is the official code repository for the [NeCA](https://www.mdpi.com/2306-5354/11/12/1227) paper by Yiying Wang, Abhirup Banerjee and Vicente Grau, published at Bioengineering (Invited: free of APC).
 
 ## Citation
 
