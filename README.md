@@ -35,18 +35,10 @@ Cardiovascular diseases (CVDs) are the most common health threats worldwide. 2D 
 
 # 3. Packages Requirement
 
-This work requires following dependency packages:
+For this repo to work use `uv` package manager to set up the environment:
 
 ```
-python: 3.8.17
-pytorch: 1.9.0 
-numpy: 1.24.4 
-ninja: 1.11.1
-PyYAML: 6.0
-odl: 1.0.0.dev0
-astra-toolbox: 2.1.0
-tqdm: 4.65.0
-argparse
+uv sync
 ```
 
 # 4. Code Instructions
