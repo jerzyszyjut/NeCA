@@ -3,17 +3,10 @@ name = "neca"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.9"
 dependencies = [
-    "argparse>=1.4.0",
-    "astra-toolbox>=2.2.0",
-    "matplotlib>=3.10.6",
-    "napari[all]>=0.4.18",
-    "nibabel>=5.3.2",
-    "ninja>=1.13.0",
-    "numpy>=2.3.2",
-    "odl>=0.7.0",
-    "pyyaml>=6.0.2",
-    "torch>=2.8.0",
-    "tqdm>=4.67.1",
+    "ninja==1.11.1",
+    "numpy==1.24.4",
+    "pyyaml==6.0",
+    "torch==1.9.0",
 ]

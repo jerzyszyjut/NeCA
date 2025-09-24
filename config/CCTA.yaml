@@ -21,7 +21,7 @@ render:
   n_fine: 0
   netchunk: 699060
 train:
-  epoch: 5000
+  epoch: 10000
   lrate: 0.0001
   lrate_gamma: 0.1
   lrate_step: 5000
