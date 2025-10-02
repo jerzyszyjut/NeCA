@@ -39,6 +39,7 @@ For this repo to work use `uv` package manager to set up the environment:
 
 ```
 uv sync
+uv pip install setuptools==59.5.0
 ```
 
 # 4. Code Instructions
