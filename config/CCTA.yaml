@@ -21,11 +21,12 @@ render:
   n_fine: 0
   netchunk: 699060
 train:
-  epoch: 10000
+  epoch: 5000
   lrate: 0.0001
   lrate_gamma: 0.1
   lrate_step: 5000
   resume: False
+  seed: 42
 log:
   i_eval: 100
   i_save: 300

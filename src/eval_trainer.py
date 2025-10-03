@@ -1,33 +1,20 @@
 import os
 import os.path as osp
-import json
 import torch
 from torch.utils.tensorboard.writer import SummaryWriter
 from tqdm import tqdm
-from shutil import copyfile
 import numpy as np
-import random
 import math
 import yaml
 
 from .dataset import TIGREDataset as Dataset
 from .network import get_network
 from .encoder import get_encoder
+from .trainer import Trainer
 from src.render import run_network
 
 from src.render.ct_geometry_projector import ConeBeam3DProjector
 from odl.tomo.util.utility import axis_rotation, rotation_matrix_from_to
-
-
-def set_seed(seed):
-    """Set seed for reproducibility"""
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
 
 
 def rotation_matrix_to_axis_angle(m):
@@ -47,13 +34,8 @@ def rotation_matrix_to_axis_angle(m):
     return axis, angle
 
 
-class Trainer:
+class EvalTrainer(Trainer):
     def __init__(self, cfg, device="cuda"):
-        # Set seed for reproducibility
-        if "seed" in cfg["train"]:
-            set_seed(cfg["train"]["seed"])
-            print(f"Seed set to: {cfg['train']['seed']}")
-
         # Args
         self.global_step = 0
         self.conf = cfg
@@ -80,7 +62,7 @@ class Trainer:
 
         # VARIABLE                                          DESCRIPTION                    UNITS
         # -------------------------------------------------------------------------------------
-        # dsd = data["DSD"]  # Distance Source Detector   mm
+        dsd = data["DSD"]  # Distance Source Detector   mm
         dso = data["DSO"]  # Distance Source Origin      mm
         dde = data["DDE"]
 
@@ -215,12 +197,8 @@ class Trainer:
         self.writer = SummaryWriter(self.expdir)
         self.writer.add_text("parameters", self.args2string(cfg), global_step=0)
 
-    def args2string(self, hp):
-        """
-        Transfer args to string.
-        """
-        json_hp = json.dumps(hp, indent=2)
-        return "".join("\t" + line for line in json_hp.splitlines(True))
+        # Loss function
+        self.l2_loss = torch.nn.MSELoss(reduction="mean")
 
     def start(self):
         """
@@ -233,22 +211,6 @@ class Trainer:
             pbar.update(self.epoch_start * iter_per_epoch)
 
         for idx_epoch in range(self.epoch_start, self.epochs + 1):
-            # Evaluate
-            if (
-                idx_epoch % self.i_eval == 0 or idx_epoch == self.epochs
-            ) and self.i_eval > 0:
-                self.net.eval()
-                with torch.no_grad():
-                    # print(self.voxels.shape) #torch.Size([128, 128, 128, 3])
-                    image_pred = run_network(
-                        self.voxels,
-                        self.net_fine if self.net_fine is not None else self.net,
-                        self.netchunk,
-                    )
-                    image_pred = (image_pred.squeeze()).detach().cpu().numpy()
-
-                    np.save(self.evaldir + "/" + str(idx_epoch), image_pred)
-
             # Train
             # for data in self.train_dloader:
             self.global_step += 1
@@ -262,37 +224,17 @@ class Trainer:
             )
             pbar.update(1)
 
-            # Save
-            if (
-                (idx_epoch % self.i_save == 0 or idx_epoch == self.epochs)
-                and self.i_save > 0
-                and idx_epoch > 0
-                and self.net_fine is not None
-            ):
-                if osp.exists(self.ckptdir):
-                    copyfile(self.ckptdir, self.ckptdir_backup)
-                tqdm.write(
-                    f"[SAVE] epoch: {idx_epoch}/{self.epochs}, path: {self.ckptdir}"
-                )
-                torch.save(
-                    {
-                        "epoch": idx_epoch,
-                        "network": self.net.state_dict(),
-                        "network_fine": self.net_fine.state_dict()
-                        if self.n_fine > 0
-                        else None,
-                        "optimizer": self.optimizer.state_dict(),
-                    },
-                    self.ckptdir,
-                )
-
-            # Update lrate
             self.writer.add_scalar(
                 "train/lr", self.optimizer.param_groups[0]["lr"], self.global_step
             )
             self.lr_scheduler.step()
 
-        tqdm.write(f"Training complete! See logs in {self.expdir}")
+        image_pred = run_network(
+            self.voxels,
+            self.net_fine if self.net_fine is not None else self.net,
+            self.netchunk,
+        )
+        image_pred = (image_pred.squeeze()).detach().cpu().numpy()
 
     def train_step(self, data, global_step, idx_epoch):
         """
@@ -300,12 +242,22 @@ class Trainer:
         """
         self.optimizer.zero_grad()
         loss = self.compute_loss(data, global_step, idx_epoch)
-        loss["loss"].backward()
+        loss["loss"].backward()  # type: ignore
         self.optimizer.step()
         return loss
 
     def compute_loss(self, data, global_step, idx_epoch):
-        """
-        Training step
-        """
-        raise NotImplementedError()
+        loss = {"loss": 0.0}
+
+        projs = data.projs  # .reshape(-1)
+        image_pred = run_network(self.voxels, self.net, self.netchunk)
+        train_output = image_pred.squeeze()[None, ...]  # .transpose(1,4).squeeze(4)
+
+        train_projs_one = self.ct_projector_first.forward_project(train_output)
+        train_projs_two = self.ct_projector_second.forward_project(train_output)
+
+        train_projs = torch.cat((train_projs_one, train_projs_two), 1)
+
+        loss["loss"] = self.l2_loss(train_projs, projs)
+
+        return loss
