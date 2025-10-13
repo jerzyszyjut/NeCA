@@ -6,6 +6,7 @@ from tqdm import tqdm
 import numpy as np
 import math
 import yaml
+import matplotlib.pyplot as plt
 
 from .dataset import TIGREDataset as Dataset
 from .network import get_network
@@ -51,6 +52,9 @@ class EvalTrainer(Trainer):
         self.ckptdir_backup = osp.join(self.expdir, "ckpt_backup.tar")
         self.evaldir = osp.join(self.expdir, "eval")
         os.makedirs(self.evaldir, exist_ok=True)
+
+        # Output path for saving final prediction
+        self.output_path = cfg["exp"].get("output_path", None)
 
         #######################################
         configPath = cfg["exp"]["dataconfig"]
@@ -236,6 +240,23 @@ class EvalTrainer(Trainer):
         )
         image_pred = (image_pred.squeeze()).detach().cpu().numpy()
 
+        train_output = torch.tensor(image_pred, device=self.voxels.device)[None, ...]
+        pred_projs_one = self.ct_projector_first.forward_project(train_output)
+        pred_projs_two = self.ct_projector_second.forward_project(train_output)
+        pred_projs = torch.cat((pred_projs_one, pred_projs_two), 1)
+
+        self.save_projection_images(self.train_dset.projs, pred_projs)
+
+        if self.output_path is not None:
+            output_dir = osp.dirname(self.output_path)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+
+            np.save(self.output_path, image_pred)
+            print(f"Saved final prediction to: {self.output_path}")
+        else:
+            print("No output_path specified in config, prediction not saved")
+
     def train_step(self, data, global_step, idx_epoch):
         """
         Training step
@@ -261,3 +282,53 @@ class EvalTrainer(Trainer):
         loss["loss"] = self.l2_loss(train_projs, projs)
 
         return loss
+
+    def save_projection_images(self, gt_projs, pred_projs):
+        if isinstance(gt_projs, torch.Tensor):
+            gt_projs = gt_projs.detach().cpu().numpy()
+        if isinstance(pred_projs, torch.Tensor):
+            pred_projs = pred_projs.detach().cpu().numpy()
+
+        proj_dir = osp.join(self.evaldir, "projections")
+        os.makedirs(proj_dir, exist_ok=True)
+
+        for i in range(gt_projs.shape[1]):
+            gt_proj = gt_projs[0, i]
+            pred_proj = pred_projs[0, i]
+
+            gt_norm = (gt_proj - gt_proj.min()) / (gt_proj.max() - gt_proj.min() + 1e-8)
+            pred_norm = (pred_proj - pred_proj.min()) / (
+                pred_proj.max() - pred_proj.min() + 1e-8
+            )
+
+            plt.figure(figsize=(8, 8))
+            plt.imshow(gt_norm, cmap="gray")
+            plt.axis("off")
+            plt.savefig(
+                osp.join(proj_dir, f"gt_projection_{i}.png"),
+                bbox_inches="tight",
+                dpi=150,
+            )
+            plt.close()
+
+            plt.figure(figsize=(8, 8))
+            plt.imshow(pred_norm, cmap="gray")
+            plt.axis("off")
+            plt.savefig(
+                osp.join(proj_dir, f"pred_projection_{i}.png"),
+                bbox_inches="tight",
+                dpi=150,
+            )
+            plt.close()
+
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+            ax1.imshow(gt_norm, cmap="gray")
+            ax1.axis("off")
+            ax2.imshow(pred_norm, cmap="gray")
+            ax2.axis("off")
+            plt.savefig(
+                osp.join(proj_dir, f"comparison_projection_{i}.png"),
+                bbox_inches="tight",
+                dpi=150,
+            )
+            plt.close()
