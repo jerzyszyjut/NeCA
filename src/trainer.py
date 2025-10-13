@@ -9,7 +9,9 @@ import numpy as np
 import random
 import math
 import yaml
-
+from pathlib import Path
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from .dataset import TIGREDataset as Dataset
 from .network import get_network
 from .encoder import get_encoder
@@ -75,102 +77,34 @@ class Trainer:
         with open(configPath, "r") as handle:
             data = yaml.safe_load(handle)
 
-        # data["projections"] = np.load(data["datadir"] + '_projs.npy')
-        data["projections"] = np.load(data["datadir"])
+        self.data_dir = data["datadir"]
+
+        data["projections"] = np.load(self.data_dir)
 
         # VARIABLE                                          DESCRIPTION                    UNITS
         # -------------------------------------------------------------------------------------
-        # dsd = data["DSD"]  # Distance Source Detector   mm
-        dso = data["DSO"]  # Distance Source Origin      mm
-        dde = data["DDE"]
-
-        # Detector parameters
-        proj_size = np.array(data["nDetector"])  # number of pixels              (px)
-        proj_reso = np.array(data["dDetector"])
-        # Image parameters
-        image_size = np.array(data["nVoxel"])  # number of voxels              (vx)
-        image_reso = np.array(data["dVoxel"])  # size of each voxel            (mm)
-
-        first_proj_angle = [
-            -data["first_projection_angle"][1],
-            data["first_projection_angle"][0],
-        ]
-        second_proj_angle = [
-            -data["second_projection_angle"][1],
-            data["second_projection_angle"][0],
-        ]
-
-        #############
-        #### first_projection
-        from_source_vec = (0, -dso[0], 0)
-        from_rot_vec = (-1, 0, 0)
-        to_source_vec = axis_rotation(
-            (0, 0, 1), angle=first_proj_angle[0] / 180 * np.pi, vectors=from_source_vec
-        )
-        to_rot_vec = axis_rotation(
-            (0, 0, 1), angle=first_proj_angle[0] / 180 * np.pi, vectors=from_rot_vec
-        )
-        to_source_vec = axis_rotation(
-            to_rot_vec[0],
-            angle=first_proj_angle[1] / 180 * np.pi,
-            vectors=to_source_vec[0],
-        )
-
-        rot_mat = rotation_matrix_from_to(from_source_vec, to_source_vec[0])
-        proj_axis, proj_angle = rotation_matrix_to_axis_angle(rot_mat)
 
         self.ct_projector_first = ConeBeam3DProjector(
-            image_size,
-            image_reso,
-            proj_angle,
-            proj_axis,
-            proj_size,
-            proj_reso,
-            dde[0],
-            dso[0],
+            data["projections_settings"][0]["alpha"],
+            data["projections_settings"][0]["beta"],
+            data["projections_settings"][0]["sid"],
+            data["projections_settings"][0]["sod"],
+            data["global"]["grid_spacing"],
+            data["global"]["grid_resolution"],
+            data["global"]["image_spacing"],
+            data["global"]["image_resolution"],
         )
-        # proj_first = ct_projector.forward_project(phantom.squeeze(4))  # [bs, x, y, z] -> [bs, n, h, w]
-
-        ### second projection
-        from_source_vec = (0, -dso[1], 0)
-        from_rot_vec = (-1, 0, 0)
-        to_source_vec = axis_rotation(
-            (0, 0, 1), angle=second_proj_angle[0] / 180 * np.pi, vectors=from_source_vec
-        )
-        to_rot_vec = axis_rotation(
-            (0, 0, 1), angle=second_proj_angle[0] / 180 * np.pi, vectors=from_rot_vec
-        )
-        to_source_vec = axis_rotation(
-            to_rot_vec[0],
-            angle=second_proj_angle[1] / 180 * np.pi,
-            vectors=to_source_vec[0],
-        )
-
-        rot_mat = rotation_matrix_from_to(from_source_vec, to_source_vec[0])
-        proj_axis, proj_angle = rotation_matrix_to_axis_angle(rot_mat)
 
         self.ct_projector_second = ConeBeam3DProjector(
-            image_size,
-            image_reso,
-            proj_angle,
-            proj_axis,
-            proj_size,
-            proj_reso,
-            dde[1],
-            dso[1],
+            data["projections_settings"][1]["alpha"],
+            data["projections_settings"][1]["beta"],
+            data["projections_settings"][1]["sid"],
+            data["projections_settings"][1]["sod"],
+            data["global"]["grid_spacing"],
+            data["global"]["grid_resolution"],
+            data["global"]["image_spacing"],
+            data["global"]["image_resolution"],
         )
-        # proj_second = ct_projector.forward_project(phantom.squeeze(4))  # [bs, x, y, z] -> [bs, n, h, w]
-
-        #####
-        # phantom = data["GT"]
-        # phantom = np.transpose(phantom, (1,2,0))[::,::-1,::-1]
-        # phantom = np.transpose(phantom, (2,1,0))[::-1,::,::].copy()
-        # phantom = torch.tensor(phantom, dtype=torch.float32)[None, ...] #.transpose(1,4).squeeze(4)
-
-        # train_projs_one = self.ct_projector_first.forward_project(phantom)
-        # train_projs_two = self.ct_projector_second.forward_project(phantom)
-
-        # data["projections"] = torch.cat((train_projs_one,train_projs_two), 1)
 
         # Dataset
         self.dataconfig = data
@@ -291,6 +225,58 @@ class Trainer:
                 "train/lr", self.optimizer.param_groups[0]["lr"], self.global_step
             )
             self.lr_scheduler.step()
+
+        image_pred = run_network(
+            self.voxels,
+            self.net_fine if self.net_fine is not None else self.net,
+            self.netchunk,
+        )
+
+        train_output = image_pred.squeeze()[None, ...]  # .transpose(1,4).squeeze(4)
+
+        projs_one = self.ct_projector_first.forward_project(train_output)
+        projs_two = self.ct_projector_second.forward_project(train_output)
+
+        proj_one_np = projs_one.squeeze().detach().cpu().numpy()
+        proj_two_np = projs_two.squeeze().detach().cpu().numpy()
+
+        output_dir = Path(self.data_dir).parent
+
+        proj_one_norm = (
+            (proj_one_np - proj_one_np.min())
+            / (proj_one_np.max() - proj_one_np.min())
+            * 255
+        ).astype(np.uint8)
+        proj_two_norm = (
+            (proj_two_np - proj_two_np.min())
+            / (proj_two_np.max() - proj_two_np.min())
+            * 255
+        ).astype(np.uint8)
+
+        plt.figure(figsize=(10, 5))
+
+        plt.subplot(1, 2, 1)
+        plt.imshow(proj_one_norm, cmap="gray")
+        plt.title("Projection 1")
+        plt.axis("off")
+
+        plt.subplot(1, 2, 2)
+        plt.imshow(proj_two_norm, cmap="gray")
+        plt.title("Projection 2")
+        plt.axis("off")
+
+        plt.tight_layout()
+        plt.savefig(
+            output_dir / "projections_combined.png", dpi=150, bbox_inches="tight"
+        )
+        plt.close()
+
+        np.save(output_dir / "projection_0.npy", proj_one_np)
+        np.save(output_dir / "projection_1.npy", proj_two_np)
+
+        image_pred = (image_pred.squeeze()).detach().cpu().numpy()
+
+        np.save(Path(self.data_dir).parent / "pred.npy", image_pred)
 
         tqdm.write(f"Training complete! See logs in {self.expdir}")
 

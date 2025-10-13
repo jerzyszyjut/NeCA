@@ -7,6 +7,7 @@ requires-python = ">=3.9"
 dependencies = [
     "astra-toolbox>=2.2.0",
     "connected-components-3d>=3.24.0",
+    "kaleido>=1.1.0",
     "matplotlib>=3.8.4",
     "ninja==1.11.1",
     "numpy==1.21.6",
